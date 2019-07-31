@@ -12,9 +12,8 @@ The present project is the implementation of the paper "Eigen-Factors: Plane Est
 
 You can find [here](http://sites.skoltech.ru/app/data/uploads/sites/50/2019/07/ferrer2019planes.pdf) the author's version of the document.
 
-Here is a video showing how the Eigen-Factors work.
+Here is a [video](https://www.youtube.com/_1u_c43DFUE) showing how the Eigen-Factors work.
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/_1u_c43DFUE" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 ## Dependencies
 
