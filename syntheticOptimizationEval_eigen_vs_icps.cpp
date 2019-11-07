@@ -17,9 +17,7 @@
 #include <vector>
 #include <algorithm>
 
-#include <Core/Core.h>
-#include <IO/IO.h>
-#include <Visualization/Visualization.h>
+#include "Open3D/Open3D.h"
 
 #include "mrob/create_points.hpp"
 #include "mrob/plane_registration.hpp"
@@ -37,7 +35,7 @@ void print_statistics(std::vector<std::vector<double>> &res)
 }
 
 
-void fill_point_cloud(mrob::CreatePoints &scene, std::shared_ptr<open3d::PointCloud> pointcloud, uint_t t, Mat31 color)
+void fill_point_cloud(mrob::CreatePoints &scene, std::shared_ptr<open3d::geometry::PointCloud> pointcloud, uint_t t, Mat31 color)
 {
     pointcloud->Clear();
     auto points = scene.get_point_cloud(t);
@@ -121,17 +119,27 @@ for (numPoses = 2; numPoses < 41; numPoses +=2 )
         
         // Method 2: ICP with some variants
         {
-            // create point clouds            
-            auto sourcePc = std::make_shared<open3d::PointCloud>();
-            auto targetPc = std::make_shared<open3d::PointCloud>();
+            // create point clouds, example taken from open3d/examples/cpp/registrtion and examples/python/icp_registration.py
+            auto sourcePc = std::make_shared<open3d::geometry::PointCloud>();
+            auto targetPc = std::make_shared<open3d::geometry::PointCloud>();
             fill_point_cloud(scene, targetPc, 0, Mat31(0,0,1.0));
             fill_point_cloud(scene, sourcePc, numPoses-1, Mat31(0.95,0,0));
             
             t1 = std::chrono::steady_clock::now();
             
-            open3d::EstimateNormals(*sourcePc, open3d::KDTreeSearchParamHybrid(0.1, 30));
-            open3d::EstimateNormals(*targetPc, open3d::KDTreeSearchParamHybrid(0.1, 30));
-            auto result = open3d::RegistrationICP(*sourcePc , *targetPc, 0.25, T_ini.T(), open3d::TransformationEstimationPointToPlane());
+            /* Functions for ICP registration
+               RegistrationResult RegistrationICP(
+                   const geometry::PointCloud &source,
+                   const geometry::PointCloud &target,
+                   double max_correspondence_distance,
+                   const Eigen::Matrix4d &init = Eigen::Matrix4d::Identity(),
+                   const TransformationEstimation &estimation =
+                           TransformationEstimationPointToPoint(false),
+                   const ICPConvergenceCriteria &criteria = ICPConvergenceCriteria());*/      
+            sourcePc->EstimateNormals(open3d::geometry::KDTreeSearchParamHybrid(0.1, 30));
+            //open3d::EstimateNormals(*targetPc, open3d::KDTreeSearchParamHybrid(0.1, 30));//old call from 0.5
+            targetPc->EstimateNormals(open3d::geometry::KDTreeSearchParamHybrid(0.1, 30));
+            auto result = open3d::registration::RegistrationICP(*sourcePc , *targetPc, 0.25, T_ini.T(), open3d::registration::TransformationEstimationPointToPlane());
             t2 = std::chrono::steady_clock::now();
             dif = std::chrono::duration_cast<Ttim>(t2 - t1);
             
@@ -146,7 +154,7 @@ for (numPoses = 2; numPoses < 41; numPoses +=2 )
         // Method 3: ICP planes
         
             t1 = std::chrono::steady_clock::now();
-            auto result2 = open3d::RegistrationICP(*sourcePc , *targetPc, 0.05, T_ini.T(), open3d::TransformationEstimationPointToPoint(true));
+            auto result2 = open3d::registration::RegistrationICP(*sourcePc , *targetPc, 0.05, T_ini.T(), open3d::registration::TransformationEstimationPointToPoint(true));
             t2 = std::chrono::steady_clock::now();
             dif = std::chrono::duration_cast<Ttim>(t2 - t1);
             

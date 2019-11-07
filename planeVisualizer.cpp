@@ -15,16 +15,14 @@
 #include <thread>
 #include <chrono>
 
-#include <Core/Core.h>
-#include <IO/IO.h>
-#include <Visualization/Visualization.h>
+#include "Open3D/Open3D.h"
 
 #include "mrob/create_points.hpp"
 #include "mrob/plane_registration.hpp"
 #include "mrob/SE3.hpp"
 
 
-void fill_point_cloud(mrob::CreatePoints &scene, std::shared_ptr<open3d::PointCloud> pointcloud, uint_t t, Mat31 color)
+void fill_point_cloud(mrob::CreatePoints &scene, std::shared_ptr<open3d::geometry::PointCloud> pointcloud, uint_t t, Mat31 color)
 {
     pointcloud->Clear();
     auto points = scene.get_point_cloud(t);
@@ -36,7 +34,7 @@ void fill_point_cloud(mrob::CreatePoints &scene, std::shared_ptr<open3d::PointCl
     }
 }
 
-void fill_point_cloud_pose(mrob::CreatePoints &scene, mrob::PlaneRegistration &planeReg, std::shared_ptr<open3d::PointCloud> pointcloud)
+void fill_point_cloud_pose(mrob::CreatePoints &scene, mrob::PlaneRegistration &planeReg, std::shared_ptr<open3d::geometry::PointCloud> pointcloud)
 {
     Mat31 colorIni(1.0,0.0,0.0), colorEnd(0.0,0.0,0.8);
     double cont_p = 0.0;
@@ -61,12 +59,12 @@ void fill_point_cloud_pose(mrob::CreatePoints &scene, mrob::PlaneRegistration &p
 }
 
 
-void create_trajectory(std::vector<mrob::SE3> &traj, std::shared_ptr<open3d::TriangleMesh> &markers, double size)
+void create_trajectory(std::vector<mrob::SE3> &traj, std::shared_ptr<open3d::geometry::TriangleMesh> &markers, double size)
 {
     markers->Clear();
     for ( mrob::SE3& pose: traj)
     {
-        auto mesh = open3d::CreateMeshCoordinateFrame(size);
+        auto mesh = open3d::geometry::TriangleMesh::CreateCoordinateFrame(size);
         mesh->Transform(pose.T());
         *markers += *mesh;
     }
@@ -76,7 +74,8 @@ int main(int argc, char *argv[]) {
     
     typedef std::chrono::microseconds Ttim;
 
-    open3d::SetVerbosityLevel(open3d::VerbosityLevel::VerboseAlways);
+    // from examples.cpp/visualizer.cpp
+    open3d::utility::SetVerbosityLevel(open3d::utility::VerbosityLevel::Debug);
 
     // generate points from mrob generate_planes
     uint_t numPlanes = 3, numPoses = 10, numPoints = 400;
@@ -97,7 +96,7 @@ int main(int argc, char *argv[]) {
     
 
     // fill pointcloud with current palnes data
-    auto pointcloud = std::make_shared<open3d::PointCloud>();
+    auto pointcloud = std::make_shared<open3d::geometry::PointCloud>();
     auto t1 = std::chrono::steady_clock::now();
     fill_point_cloud_pose(scene, planeRegistration, pointcloud);
     auto t2 = std::chrono::steady_clock::now();
@@ -105,18 +104,18 @@ int main(int argc, char *argv[]) {
     std::cout << "Time spent on building PC " << dif.count() << std::endl;
     
     // calcualte a solution and plot it
-    auto traj = std::make_shared<open3d::TriangleMesh>();
-    auto trajGT = std::make_shared<open3d::TriangleMesh>();
+    auto traj = std::make_shared<open3d::geometry::TriangleMesh>();
+    auto trajGT = std::make_shared<open3d::geometry::TriangleMesh>();
     create_trajectory(scene.get_ground_truth_trajectory(), trajGT,0.1);
     create_trajectory(*planeRegistration.get_transformations(), traj,0.5);
-    open3d::DrawGeometries({pointcloud,traj,trajGT}, "PointCloud", 1600, 900);
+    open3d::visualization::DrawGeometries({pointcloud,traj,trajGT}, "PointCloud", 1600, 900);
     
     // initialize solution
     planeRegistration.solve_initialize();
     mrob::SE3 T_ini = planeRegistration.get_transformations()->back();
     fill_point_cloud_pose(scene, planeRegistration, pointcloud);
     create_trajectory(*planeRegistration.get_transformations(), traj,0.5);
-    open3d::DrawGeometries({pointcloud,traj,trajGT}, "PointCloud", 1600, 900);
+    open3d::visualization::DrawGeometries({pointcloud,traj,trajGT}, "PointCloud", 1600, 900);
     for ( uint_t i = 0; i < 100; ++i)
     {
         t1 = std::chrono::steady_clock::now();
@@ -131,14 +130,14 @@ int main(int argc, char *argv[]) {
         {
             fill_point_cloud_pose(scene, planeRegistration, pointcloud);
             create_trajectory(*planeRegistration.get_transformations(), traj,0.5);
-            open3d::DrawGeometries({pointcloud,traj,trajGT}, "PointCloud", 1600, 900);
+            open3d::visualization::DrawGeometries({pointcloud,traj,trajGT}, "PointCloud", 1600, 900);
         }
     }
 
 // a second method to compare against
 if (0)
 {
-    open3d::PrintInfo("New optimization method.\n");
+    open3d::utility::LogInfo("New optimization method.\n");
     mrob::PlaneRegistration planeRegistrationM2;
     scene.create_plane_registration(planeRegistrationM2);
     planeRegistrationM2.set_solving_method(mrob::PlaneRegistration::SolveMode::GRADIENT_DESCENT_NAIVE);
@@ -148,7 +147,7 @@ if (0)
     
     fill_point_cloud_pose(scene, planeRegistrationM2, pointcloud);
     create_trajectory(*planeRegistrationM2.get_transformations(), traj,0.5);
-    open3d::DrawGeometries({pointcloud,traj,trajGT}, "PointCloud", 1600, 900);
+    open3d::visualization::DrawGeometries({pointcloud,traj,trajGT}, "PointCloud", 1600, 900);
     planeRegistrationM2.solve_initialize();
     for ( uint_t i = 0; i < 100; ++i)
     {
@@ -165,7 +164,7 @@ if (0)
             //planeRegistrationM2.set_alpha_parameter(alpha);
             create_trajectory(*planeRegistrationM2.get_transformations(), traj,0.5);
             fill_point_cloud_pose(scene, planeRegistrationM2, pointcloud);
-            open3d::DrawGeometries({pointcloud,traj,trajGT}, "PointCloud", 1600, 900);
+            open3d::visualization::DrawGeometries({pointcloud,traj,trajGT}, "PointCloud", 1600, 900);
         }
     }
 }
@@ -173,20 +172,20 @@ if(1)
 {
     // ICP solution:
     // 1) create source point cloud and target point cloud
-    open3d::PrintInfo("ICP method.\n");
-    auto sourcePc = std::make_shared<open3d::PointCloud>();
-    auto targetPc = std::make_shared<open3d::PointCloud>();
+    open3d::utility::LogInfo("ICP method.\n");
+    auto sourcePc = std::make_shared<open3d::geometry::PointCloud>();
+    auto targetPc = std::make_shared<open3d::geometry::PointCloud>();
     fill_point_cloud(scene, targetPc, 0, Mat31(0,0,1.0));
     fill_point_cloud(scene, sourcePc, numPoses-1, Mat31(0.95,0,0));
     // how to plot the trajectory?
-    open3d::DrawGeometries({sourcePc,targetPc,trajGT}, "PointCloud", 1600, 900);
+    open3d::visualization::DrawGeometries({sourcePc,targetPc,trajGT}, "PointCloud", 1600, 900);
     
     t1 = std::chrono::steady_clock::now();
     T_ini.print();
-    //auto result = open3d::RegistrationICP(*sourcePc , *targetPc, 0.05, T_ini.T(), open3d::TransformationEstimationPointToPoint(true));
-    open3d::EstimateNormals(*sourcePc, open3d::KDTreeSearchParamHybrid(0.1, 30));
-    open3d::EstimateNormals(*targetPc, open3d::KDTreeSearchParamHybrid(0.1, 30));
-    auto result = open3d::RegistrationICP(*sourcePc , *targetPc, 0.5, T_ini.T(), open3d::TransformationEstimationPointToPlane());
+    //auto result = open3d::resitration::RegistrationICP(*sourcePc , *targetPc, 0.05, T_ini.T(), open3d::registration::TransformationEstimationPointToPoint(true));
+    sourcePc->EstimateNormals(open3d::geometry::KDTreeSearchParamHybrid(0.1, 30));
+    targetPc->EstimateNormals(open3d::geometry::KDTreeSearchParamHybrid(0.1, 30));
+    auto result = open3d::registration::RegistrationICP(*sourcePc , *targetPc, 0.5, T_ini.T(), open3d::registration::TransformationEstimationPointToPlane());
     t2 = std::chrono::steady_clock::now();
     dif = std::chrono::duration_cast<Ttim>(t2 - t1);
     std::cout << "Time spent on calculating a solution " << dif.count() << std::endl;
@@ -199,7 +198,7 @@ if(1)
           << ", trajectory error ICP = "<< scene.get_ground_truth_trajectory().back().distance(T_res)
           << ", error from method NAG = " << scene.get_ground_truth_trajectory().back().distance(planeRegistration.get_transformations()->back()) << std::endl;
     
-    open3d::DrawGeometries({sourcePc,targetPc,trajGT}, "PointCloud", 1600, 900);
+    open3d::visualization::DrawGeometries({sourcePc,targetPc,trajGT}, "PointCloud", 1600, 900);
 }    
     
 
